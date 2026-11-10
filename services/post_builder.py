@@ -16,7 +16,6 @@ class PostBuilder:
 
     def build(self, product: Product, custom_text: str = None) -> dict:
         """Retorna dict com caption HTML + photo URL pronto pro Telegram"""
-        # 1. Gera o texto (copy) se não foi passado
         if not custom_text:
             text = self.ai.generate(
                 product_name=product.name,
@@ -26,12 +25,10 @@ class PostBuilder:
         else:
             text = custom_text
 
-        # 2. Encurta URL
         short_url = product.short_url or self.shortener.shorten(
             product.affiliate_url, product_id=product.id
         )
 
-        # 3. Monta o caption final
         caption = f"{text}\n\n🔗 {short_url}"
 
         return {
