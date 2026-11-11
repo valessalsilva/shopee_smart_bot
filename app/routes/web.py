@@ -46,7 +46,7 @@ async def product_detail(request: Request, product_id: int, db: Session = Depend
 @router.get("/r/{code}")
 async def redirect_short(code: str, request: Request, db: Session = Depends(get_db)):
     """Redireciona link encurtado, registrando o clique"""
-    click = ClickRepository(db).get_by_code(code)
+    click = ClickRepository(db).get_by_code(code, with_product=True)
     if not click:
         raise HTTPException(status_code=404, detail="Link não encontrado")
 
@@ -58,7 +58,7 @@ async def redirect_short(code: str, request: Request, db: Session = Depends(get_
     )
 
     # Redireciona para o link de afiliado
-    product = ProductRepository(db).get_by_id(click.product_id)
-    if product:
-        return RedirectResponse(url=product.affiliate_url)
+    # Redireciona para o link de afiliado (relacionamento Click.product)
+    if click.product:
+        return RedirectResponse(url=click.product.affiliate_url)
     return RedirectResponse(url="https://shopee.com.br")

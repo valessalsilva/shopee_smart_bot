@@ -7,7 +7,7 @@ import logging
 from app.models import Product
 from app.repositories import ProductRepository
 from app.services.shopee import shopee
-from database import get_session
+from database import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +30,7 @@ def offer_to_product(offer: dict) -> Product:
 
 def save_offers(offers: list) -> int:
     """Grava as ofertas novas (ignora as já existentes). Retorna quantas foram inseridas."""
-    session = get_session()
-    try:
+    with session_scope() as session:
         repo = ProductRepository(session)
         inserted = 0
         for offer in offers:
@@ -43,8 +42,6 @@ def save_offers(offers: list) -> int:
             inserted += 1
         repo.commit()
         return inserted
-    finally:
-        session.close()
 
 
 async def sync_shopee_offers():

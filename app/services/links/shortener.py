@@ -10,7 +10,7 @@ import requests
 
 from app.repositories import ClickRepository
 from config import settings
-from database import get_session
+from database import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +53,7 @@ class URLShortener:
 
     def _generate_own(self, original_url: str, product_id: int = None) -> str:
         """Gera link curto próprio (para usar com /r/{code})"""
-        session = get_session()
-        try:
+        with session_scope() as session:
             clicks = ClickRepository(session)
             for _ in range(10):  # tenta 10 vezes gerar código único
                 code = self._generate_code()
@@ -62,33 +61,19 @@ class URLShortener:
                     clicks.create(code=code, product_id=product_id)
                     return f"{settings.SITE_URL}/r/{code}"
             raise Exception("Não foi possível gerar código único")
-        finally:
-            session.close()
 
     def _save_and_return(self, short_url: str, original_url: str, product_id: int) -> str:
         """Salva encurtamento externo no banco"""
-        session = get_session()
-        try:
-            code = short_url.split("/")[-1]
+        code = short_url.split("/")[-1]
+        with session_scope() as session:
             ClickRepository(session).create(code=code, product_id=product_id)
-            return short_url
-        finally:
-            session.close()
+        return short_url
 
     def register_click(self, code: str, ip: str, user_agent: str) -> int:
         """Registra um clique e retorna o product_id"""
-        session = get_session()
-        try:
-            clicks = ClickRepository(session)
-            click = clicks.get_by_code(code)
-            if click:
-                click.user_ip = ip
-                click.user_agent = user_agent
-                clicks.commit()
-                return click.product_id or 0
-            return 0
-        finally:
-            session.close()
+        with session_scope() as session:
+            click = ClickRepository(session).register_access(code, ip, user_agent)
+            return (click.product_id or 0) if click else 0
 
 
 shortener = URLShortener()

@@ -18,7 +18,7 @@ from app.models import Product
 from app.repositories import ClickRepository, ProductRepository
 from app.services.offers.post_builder import post_builder
 from config import settings
-from database import get_session
+from database import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +51,7 @@ async def cmd_produtos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != settings.TELEGRAM_ADMIN_ID:
         return
 
-    session = get_session()
-    try:
+    with session_scope() as session:
         products = ProductRepository(session).list_active()
         if not products:
             await update.message.reply_text("Nenhum produto cadastrado.")
@@ -69,8 +68,6 @@ async def cmd_produtos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup,
             parse_mode="HTML",
         )
-    finally:
-        session.close()
 
 
 async def callback_post_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -82,8 +79,7 @@ async def callback_post_product(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     product_id = int(query.data.split("_")[1])
-    session = get_session()
-    try:
+    with session_scope() as session:
         product = ProductRepository(session).get_by_id(product_id)
         if not product:
             await query.edit_message_text("❌ Produto não encontrado.")
@@ -92,8 +88,6 @@ async def callback_post_product(update: Update, context: ContextTypes.DEFAULT_TY
         # Posta o produto
         result = await post_builder.auto_post(product)
         await query.edit_message_text(f"✅ Postado! {result}")
-    finally:
-        session.close()
 
 
 async def cmd_novo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -130,12 +124,9 @@ async def handle_product_data(update: Update, context: ContextTypes.DEFAULT_TYPE
             category=category,
             discount=int((1 - float(sale) / float(original)) * 100),
         )
-        session = get_session()
-        try:
+        with session_scope() as session:
             ProductRepository(session).add(product)
             await update.message.reply_text(f"✅ Produto '{name}' cadastrado! ID: {product.id}")
-        finally:
-            session.close()
 
         context.user_data["awaiting_product"] = False
     except Exception as e:
@@ -147,8 +138,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != settings.TELEGRAM_ADMIN_ID:
         return
 
-    session = get_session()
-    try:
+    with session_scope() as session:
         total_clicks = ClickRepository(session).count()
         total_products = ProductRepository(session).count_active()
         await update.message.reply_text(
@@ -157,8 +147,6 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🖱 Cliques rastreados: {total_clicks}",
             parse_mode="HTML",
         )
-    finally:
-        session.close()
 
 
 # ===========================================

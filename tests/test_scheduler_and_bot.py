@@ -3,8 +3,12 @@ from app.services.scheduler import jobs
 
 def test_pick_random_product(make_product):
     assert jobs.pick_random_product() is None
+    make_product(name="Inativo", active=False)
     make_product(name="Único")
-    assert jobs.pick_random_product().name == "Único"
+    picked = jobs.pick_random_product()
+    # O objeto sai da sessão já carregado (o post_builder usa esses campos depois)
+    assert (picked.name, picked.affiliate_url, picked.image_url) == (
+        "Único", "https://shopee.com.br/produto-1", "http://img/1.jpg")
 
 
 def test_configure_jobs(monkeypatch):

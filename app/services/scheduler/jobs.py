@@ -2,8 +2,8 @@
 Agendador de postagens automáticas em horários específicos.
 Usa APScheduler para disparar o job em cada horário configurado.
 """
-import random
 import logging
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -11,7 +11,7 @@ from app.models import Product
 from app.repositories import ProductRepository
 from app.services.offers.post_builder import post_builder
 from config import settings
-from database import get_session
+from database import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,8 @@ scheduler = AsyncIOScheduler()
 
 def pick_random_product() -> Product:
     """Seleciona um produto aleatório ativo para postar"""
-    session = get_session()
-    try:
-        products = ProductRepository(session).list_active()
-        if not products:
-            return None
-        return random.choice(products)
-    finally:
-        session.close()
+    with session_scope() as session:
+        return ProductRepository(session).get_random_active()
 
 
 async def job_post_product():
