@@ -17,39 +17,47 @@ Robô completo pra divulgar promoções da Shopee automaticamente no **Telegram*
 ## 📁 Estrutura
 
 ```
-divulgador-inteligente/
-├── main.py                      # Inicializa tudo (bot + site + scheduler)
-├── app.py                       # Site FastAPI
-├── config.py                    # Configurações (.env)
-├── database.py                  # Modelos do banco (SQLite)
+shopee_smart_bot/
+├── main.py                      # Ponto de entrada (site + bot + agendador)
+├── app/
+│   ├── factory.py               # Cria o FastAPI e controla startup/shutdown
+│   ├── models/                  # Entidades: Product, Post, Click
+│   ├── repositories/            # Consultas ao banco (ProductRepository, ClickRepository)
+│   ├── routes/
+│   │   ├── web.py               # Páginas HTML: /, /produto/{id}, /r/{code}
+│   │   └── api.py               # JSON: /api/products, /api/stats
+│   ├── services/
+│   │   ├── shopee/client.py     # Integração API Shopee
+│   │   ├── telegram/sender.py   # Envio de postagens aos chats
+│   │   ├── telegram/bot.py      # Comandos do bot
+│   │   ├── ai/copy_generator.py # Geração de texto com OpenAI
+│   │   ├── offers/post_builder.py # Monta a postagem final
+│   │   ├── offers/sync.py       # Sincroniza ofertas da Shopee para o banco
+│   │   ├── scheduler/jobs.py    # Agendador (APScheduler)
+│   │   └── links/shortener.py   # Encurtador de links + cliques
+│   ├── templates/               # index.html, product.html
+│   └── static/                  # CSS/JS (servido em /static)
+├── config/settings.py           # Configurações (.env)
+├── database/connection.py       # Engine, sessões e init_db
+├── tests/                       # Testes automatizados (pytest)
+├── scripts/teste_bot.py         # Teste manual de envio no Telegram
 ├── requirements.txt             # Dependências
-├── .env.example                 # Variáveis a preencher
-├── services/
-│   ├── shopee.py                # Integração API Shopee
-│   ├── ai_copy.py               # Geração de texto com OpenAI
-│   ├── telegram_bot.py          # Bot do Telegram
-│   ├── post_builder.py          # Constrói a postagem final
-│   ├── url_shortener.py         # Encurtador de links
-│   └── scheduler.py             # Agendador (APScheduler)
-└── templates/
-    ├── index.html               # Vitrine de produtos
-    └── product.html             # Detalhe do produto
+├── requirements-dev.txt         # Dependências de teste
+└── .env.example                 # Variáveis a preencher
 ```
 
 ## 🚀 Como rodar (Windows)
 
 ### 1. Pré-requisitos
-- Python 3.10+ instalado
+- Python 3.14 (versões das dependências testadas nele)
 - Conta de afiliado Shopee (https://affiliate.shopee.com.br)
 - Bot criado no Telegram (fale com @BotFather)
 
 ### 2. Instalar dependências
 ```powershell
-cd C:\Users\valessa.lopes\divulgador-inteligente
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\install.bat
 ```
+(cria o `venv`, instala o `requirements.txt` e copia o `.env.example` para `.env`)
 
 ### 3. Configurar credenciais
 Copie `.env.example` para `.env` e preencha:
@@ -76,8 +84,18 @@ POST_SCHEDULE=09:00,12:00,15:00,18:00,21:00
 
 ### 4. Rodar
 ```powershell
-python main.py
+.\run.bat
 ```
+ou, na raiz do projeto: `py main.py`
+
+### 5. Testes
+```powershell
+py -m pip install -r requirements-dev.txt
+py -m pytest
+```
+Os testes usam um banco temporário e não chamam APIs reais.
+
+Teste manual de envio no Telegram: `py scripts/teste_bot.py`
 
 Acesse:
 - 🌐 **Site**: http://localhost:8000
@@ -105,7 +123,8 @@ Notebook Gamer | 4500.00 | 2999.00 | https://img.url | https://shopee.com.br/pro
 
 ### Via código Python
 ```python
-from database import Product, get_session
+from app.models import Product
+from database import get_session
 session = get_session()
 p = Product(
     name="Fone Bluetooth",

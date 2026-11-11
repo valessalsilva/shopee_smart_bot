@@ -2,10 +2,14 @@
 Gerador de textos de venda com IA (OpenAI).
 Cria copy persuasivo com variações para teste A/B.
 """
-import os
+import logging
 import random
+
 from openai import OpenAI
+
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 COPY_TEMPLATES = [
@@ -57,7 +61,7 @@ class AICopyGenerator:
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            print(f"[AI] Erro ao gerar copy: {e}")
+            logger.error(f"[AI] Erro ao gerar copy: {e}")
             return self._fallback_copy(product_name, price, original_price)
 
     def generate_ab_variations(self, product_name: str, price: float, original_price: float = None, n: int = 3) -> list:

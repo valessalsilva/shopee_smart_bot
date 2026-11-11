@@ -3,7 +3,9 @@ Integração com a API de Afiliados da Shopee.
 Documentação: https://affiliate.shopee.com.br/
 """
 import hashlib
+import json
 import time
+
 import requests
 from config import settings
 
@@ -24,7 +26,6 @@ class ShopeeAffiliate:
 
     def _request(self, query: str, variables: dict = None) -> dict:
         """Faz uma requisição GraphQL para a Shopee"""
-        import json
         payload = json.dumps({"query": query, "variables": variables or {}})
         timestamp = int(time.time())
         signature = self._generate_signature(payload, timestamp)

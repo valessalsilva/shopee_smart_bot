@@ -7,9 +7,11 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+from app.models import Product
+from app.repositories import ProductRepository
+from app.services.offers.post_builder import post_builder
 from config import settings
-from database import Product, get_session
-from services.post_builder import post_builder
+from database import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,7 @@ def pick_random_product() -> Product:
     """Seleciona um produto aleatório ativo para postar"""
     session = get_session()
     try:
-        products = session.query(Product).filter(Product.active == True).all()
+        products = ProductRepository(session).list_active()
         if not products:
             return None
         return random.choice(products)

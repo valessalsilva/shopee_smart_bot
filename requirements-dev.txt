@@ -1,0 +1,4 @@
+# Dependências de desenvolvimento/testes
+-r requirements.txt
+pytest==9.2.0
+httpx2==2.16.0

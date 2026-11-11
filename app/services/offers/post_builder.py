@@ -2,9 +2,10 @@
 Serviço principal que monta a postagem de um produto.
 Junta: produto + copy IA + link encurtado + imagem.
 """
-from database import Product, get_session
-from services.ai_copy import ai_copy
-from services.url_shortener import shortener
+from app.models import Product
+from app.services.ai import ai_copy
+from app.services.links import shortener
+from app.services.telegram.sender import send_post
 
 
 class PostBuilder:
@@ -37,11 +38,10 @@ class PostBuilder:
             "short_url": short_url,
         }
 
-    def auto_post(self, product: Product) -> dict:
+    async def auto_post(self, product: Product) -> dict:
         """Envia automaticamente para o Telegram"""
-        from services.telegram_bot import send_post
         payload = self.build(product)
-        return send_post(payload["photo"], payload["caption"])
+        return await send_post(payload["photo"], payload["caption"])
 
 
 post_builder = PostBuilder()

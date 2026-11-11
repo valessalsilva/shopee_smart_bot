@@ -1,48 +1,26 @@
 """
-Bot do Telegram - postagens automáticas + comandos administrativos.
+Bot do Telegram - comandos administrativos.
 Roda em paralelo ao site FastAPI.
 """
-import asyncio
 import logging
-from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
-    CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
-    filters,
+    CommandHandler,
     ContextTypes,
+    MessageHandler,
+    filters,
 )
 
+from app.models import Product
+from app.repositories import ClickRepository, ProductRepository
+from app.services.offers.post_builder import post_builder
 from config import settings
-from database import Product, get_session
+from database import get_session
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-bot_instance: Bot = None
-
-
-async def send_post(photo_url: str, caption: str) -> dict:
-    """Envia uma postagem para todos os chats configurados"""
-    global bot_instance
-    if bot_instance is None:
-        bot_instance = Bot(token=settings.TELEGRAM_BOT_TOKEN)
-
-    results = []
-    for chat_id in settings.TELEGRAM_CHAT_IDS:
-        try:
-            msg = await bot_instance.send_photo(
-                chat_id=chat_id,
-                photo=photo_url,
-                caption=caption[:1024],  # limite do Telegram
-                parse_mode="HTML",
-            )
-            results.append({"chat_id": chat_id, "message_id": msg.message_id, "ok": True})
-        except Exception as e:
-            logger.error(f"Erro ao enviar para {chat_id}: {e}")
-            results.append({"chat_id": chat_id, "error": str(e), "ok": False})
-    return {"results": results}
 
 
 # ===========================================
@@ -75,7 +53,7 @@ async def cmd_produtos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     session = get_session()
     try:
-        products = session.query(Product).filter(Product.active == True).all()
+        products = ProductRepository(session).list_active()
         if not products:
             await update.message.reply_text("Nenhum produto cadastrado.")
             return
@@ -106,13 +84,12 @@ async def callback_post_product(update: Update, context: ContextTypes.DEFAULT_TY
     product_id = int(query.data.split("_")[1])
     session = get_session()
     try:
-        product = session.query(Product).filter(Product.id == product_id).first()
+        product = ProductRepository(session).get_by_id(product_id)
         if not product:
             await query.edit_message_text("❌ Produto não encontrado.")
             return
 
         # Posta o produto
-        from services.post_builder import post_builder
         result = await post_builder.auto_post(product)
         await query.edit_message_text(f"✅ Postado! {result}")
     finally:
@@ -139,7 +116,7 @@ async def handle_product_data(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     try:
         parts = [p.strip() for p in update.message.text.split("|")]
-        if len(parts) < 5:
+        if len(parts) != 6:
             await update.message.reply_text("❌ Formato inválido. Use 6 campos separados por |")
             return
 
@@ -155,8 +132,7 @@ async def handle_product_data(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         session = get_session()
         try:
-            session.add(product)
-            session.commit()
+            ProductRepository(session).add(product)
             await update.message.reply_text(f"✅ Produto '{name}' cadastrado! ID: {product.id}")
         finally:
             session.close()
@@ -171,11 +147,10 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != settings.TELEGRAM_ADMIN_ID:
         return
 
-    from database import Click
     session = get_session()
     try:
-        total_clicks = session.query(Click).count()
-        total_products = session.query(Product).filter(Product.active == True).count()
+        total_clicks = ClickRepository(session).count()
+        total_products = ProductRepository(session).count_active()
         await update.message.reply_text(
             f"📊 <b>Estatísticas</b>\n\n"
             f"📦 Produtos ativos: {total_products}\n"

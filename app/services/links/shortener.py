@@ -2,12 +2,17 @@
 Encurtador de URLs próprio + integração opcional com Bitly.
 Cada link encurtado rastreia cliques.
 """
-import string
+import logging
 import random
+import string
+
 import requests
-from sqlalchemy.orm import Session
-from database import Click, get_session
+
+from app.repositories import ClickRepository
 from config import settings
+from database import get_session
+
+logger = logging.getLogger(__name__)
 
 
 class URLShortener:
@@ -28,7 +33,7 @@ class URLShortener:
                 if short:
                     return self._save_and_return(short, original_url, product_id)
             except Exception as e:
-                print(f"[Bitly] Erro: {e}")
+                logger.error(f"[Bitly] Erro: {e}")
 
         # 2. Fallback: encurtador próprio
         return self._generate_own(original_url, product_id)
@@ -48,20 +53,13 @@ class URLShortener:
 
     def _generate_own(self, original_url: str, product_id: int = None) -> str:
         """Gera link curto próprio (para usar com /r/{code})"""
-        session: Session = get_session()
+        session = get_session()
         try:
+            clicks = ClickRepository(session)
             for _ in range(10):  # tenta 10 vezes gerar código único
                 code = self._generate_code()
-                existing = session.query(Click).filter(Click.short_code == code).first()
-                if not existing:
-                    click = Click(
-                        product_id=product_id,
-                        short_code=code,
-                        user_ip="",
-                        user_agent="",
-                    )
-                    session.add(click)
-                    session.commit()
+                if not clicks.code_exists(code):
+                    clicks.create(code=code, product_id=product_id)
                     return f"{settings.SITE_URL}/r/{code}"
             raise Exception("Não foi possível gerar código único")
         finally:
@@ -72,14 +70,7 @@ class URLShortener:
         session = get_session()
         try:
             code = short_url.split("/")[-1]
-            click = Click(
-                product_id=product_id,
-                short_code=code,
-                user_ip="",
-                user_agent="",
-            )
-            session.add(click)
-            session.commit()
+            ClickRepository(session).create(code=code, product_id=product_id)
             return short_url
         finally:
             session.close()
@@ -88,12 +79,12 @@ class URLShortener:
         """Registra um clique e retorna o product_id"""
         session = get_session()
         try:
-            click = session.query(Click).filter(Click.short_code == code).first()
+            clicks = ClickRepository(session)
+            click = clicks.get_by_code(code)
             if click:
                 click.user_ip = ip
                 click.user_agent = user_agent
-                click.clicked_at = click.clicked_at  # atualiza
-                session.commit()
+                clicks.commit()
                 return click.product_id or 0
             return 0
         finally:
